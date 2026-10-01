@@ -1051,44 +1051,40 @@ dialog::backdrop{background:#08111bcc;}dialog h2{font-size:1.8rem;clear:both;mar
     <script>
 (function(){
  const names={imob:'IMOB Rénovation',chalet:'Chalet Altitude',golden:'Golden Scissors'};
- let active=null;
+ let active=null,currentDemo=null;
  const modal=document.createElement('dialog');modal.className='demo-modal';modal.setAttribute('aria-label','Démonstration agrandie');
  modal.innerHTML='<button type="button" class="demo-exit">Réduire la démonstration</button><div class="demo-modal-body"></div>';
  document.body.append(modal);
  function restore(){if(active){active.slot.append(active.frame);active.expand.focus();active=null;}document.documentElement.style.overflow='';}
- modal.querySelector('button').onclick=()=>modal.close();modal.addEventListener('close',restore);
+ modal.querySelector('button').onclick=()=>{restore();modal.close();};modal.addEventListener('close',()=>{if(!modal.open)restore();});
  Object.keys(names).forEach(key=>{
   const preview=document.querySelector('.portfolio-preview[data-portfolio-demo="'+key+'"]');
   const slot=document.createElement('div');slot.className='demo-slot';slot.hidden=true;
   const controls=document.createElement('div');controls.className='demo-controls';controls.hidden=true;
   const expand=document.createElement('button');expand.type='button';expand.textContent='Agrandir';
   const close=document.createElement('button');close.type='button';close.textContent='Fermer la démo';
-  controls.append(expand,close);preview.after(slot,controls);let frame;
-  let loading=false, source=null;
+  controls.append(expand,close);preview.after(slot,controls);let frame=null;
   const status=document.createElement('p');status.setAttribute('role','status');status.setAttribute('aria-live','polite');status.hidden=true;controls.after(status);
-  async function open(){
-   if(loading)return;
+  function closeDemo(){
+   if(active && active.frame===frame){restore();modal.close();}
+   if(frame){frame.onload=null;frame.remove();frame=null;}
+   preview.hidden=false;preview.removeAttribute('aria-busy');slot.hidden=true;controls.hidden=true;status.hidden=true;
+   if(currentDemo===closeDemo)currentDemo=null;
+  }
+  function open(){
+   if(currentDemo && currentDemo!==closeDemo)currentDemo();
+   currentDemo=closeDemo;
    if(!frame){
-    loading=true;preview.setAttribute('aria-busy','true');status.textContent='Chargement de la démonstration…';status.hidden=false;
-    try{
-     const local=location.protocol==='file:';
-     if(!local && source===null){
-      const response=await fetch('demos/'+key+'.html',{credentials:'omit'});
-      if(!response.ok)throw new Error('Démonstration indisponible');
-      source=await response.text();
-     }
-     frame=document.createElement('iframe');frame.title='Tester '+names[key];frame.setAttribute('sandbox','allow-scripts allow-popups allow-popups-to-escape-sandbox');frame.referrerPolicy='no-referrer';
-     if(local){frame.src='demos/'+key+'.html';}else{frame.srcdoc=source;}
-     slot.append(frame);status.hidden=true;
-    }catch(error){
-     status.textContent='La démonstration n’a pas pu être chargée. Cliquez à nouveau pour réessayer.';
-     return;
-    }finally{loading=false;preview.removeAttribute('aria-busy');}
+    preview.setAttribute('aria-busy','true');status.textContent='Chargement de la démonstration…';status.hidden=false;
+    const nextFrame=document.createElement('iframe');frame=nextFrame;
+    nextFrame.title='Tester '+names[key];nextFrame.setAttribute('sandbox','allow-scripts allow-popups allow-popups-to-escape-sandbox');nextFrame.referrerPolicy='no-referrer';
+    nextFrame.onload=()=>{if(frame===nextFrame){status.hidden=true;preview.removeAttribute('aria-busy');}};
+    nextFrame.src='demos/'+key+'.html';slot.append(nextFrame);
    }
    preview.hidden=true;slot.hidden=false;controls.hidden=false;expand.focus();
   }
-  close.onclick=()=>{if(modal.open)modal.close();if(frame)frame.remove();frame=null;preview.hidden=false;slot.hidden=true;controls.hidden=true;preview.focus();};
-  expand.onclick=()=>{active={frame,slot,expand};modal.querySelector('.demo-modal-body').append(frame);modal.showModal();document.documentElement.style.overflow='hidden';};
+  close.onclick=()=>{closeDemo();preview.focus();};
+  expand.onclick=()=>{if(!frame)return;active={frame,slot,expand};modal.querySelector('.demo-modal-body').append(frame);modal.showModal();document.documentElement.style.overflow='hidden';};
   document.querySelectorAll('[data-portfolio-demo="'+key+'"]').forEach(link=>{link.removeAttribute('target');link.removeAttribute('rel');link.setAttribute('href','#portfolio');link.setAttribute('aria-label','Tester '+names[key]+' dans cette page');link.onclick=e=>{e.preventDefault();open();};});
  });
 })();
